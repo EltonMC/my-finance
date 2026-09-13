@@ -10,5 +10,6 @@
 | Upstream context on demand | Active | `docs/decisions/0007-upstream-context-on-demand.md` | consuming a BMad handoff, deciding whether to open an upstream artifact, or managing implementation context |
 | BMad downstream delivery gates | Active | `docs/decisions/0006-bmad-downstream-delivery-gates.md` | sizing work, assessing readiness, recording risk, correcting course, or reviewing a change |
 | Versioned skill maintenance | Active | `docs/decisions/0008-versioned-skill-maintenance.md` | checking, installing, synchronizing, or updating external agent skills |
+| Mobile-first MVP | Active | `mobile-first-mvp.md` | designing or implementing the first delivery's responsive screens and interaction patterns |
 
 Add one page per durable decision using a stable, searchable topic name. Keep rationale and consequences concise. Link the ADR or implementation evidence when available.

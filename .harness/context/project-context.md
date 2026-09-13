@@ -2,7 +2,7 @@
 
 ## Product
 
-To be defined. Capture the user, problem, primary outcome, and non-goals before the first product-sized feature.
+MyFinance is a private, Brazilian-Portuguese, mobile-first personal-finance ledger. One authenticated person records checking accounts, categorized account transactions, pending monthly bills, credit-card statements, installments, chargebacks, full statement payments, and expected reward points. Bank synchronization, partial payments, interest, and live FX rates are out of scope for the first delivery.
 
 ## Technology baseline
 
@@ -30,7 +30,5 @@ To be defined. Capture the user, problem, primary outcome, and non-goals before 
 
 ## Decisions to make before implementation
 
-1. Choose the package manager.
-2. Define identity and tenant model.
-3. Define the first user journey and its authorization rules.
-4. Add actual build, test, type-check, E2E, and deploy commands to `.harness/harness.yaml`.
+1. Pin generated starter dependencies and add actual build, test, type-check, E2E, and deploy commands to `.harness/harness.yaml`.
+2. Configure a non-secret Supabase project URL and publishable key for browser integration after the local schema and tests are verified.

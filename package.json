@@ -1,13 +1,46 @@
 {
-  "name": "harness-for-noobs",
-  "version": "0.2.0",
+  "name": "myfinance",
+  "version": "0.1.0",
   "private": true,
+  "type": "module",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
     "harness": "node .harness/scripts/harness-cli.mjs",
     "check": "node .harness/scripts/harness-cli.mjs check",
-    "test": "node --test .harness/scripts/*.test.mjs"
+    "test": "vitest run",
+    "test:harness": "node --test .harness/scripts/*.test.mjs",
+    "test:watch": "vitest",
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "typecheck": "tsc -b --pretty false",
+    "docker:dev": "docker compose up --build app",
+    "docker:test": "docker compose run --rm --build test",
+    "docker:build": "docker compose run --rm --build build"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.57.4",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.35.0",
+    "@testing-library/jest-dom": "^6.8.0",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^24.5.2",
+    "@types/react": "^19.1.16",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.2",
+    "eslint": "^9.35.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.20",
+    "jsdom": "^26.1.0",
+    "typescript": "~5.9.2",
+    "typescript-eslint": "^8.42.0",
+    "vite": "^8.1.0",
+    "vitest": "^3.2.4"
   }
 }

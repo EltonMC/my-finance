@@ -18,10 +18,10 @@ execution:
   local_environment: Docker Compose
   dependency_installation: inside the application container only
   commands:
-    lint: unset
-    typecheck: unset
-    test: npm run test
-    build: unset
+    lint: docker compose run --rm --build test npm run lint
+    typecheck: docker compose run --rm --build test npm run typecheck
+    test: docker compose run --rm --build test npm run test
+    build: docker compose run --rm --build build
     e2e: unset
     harness_check: npm run check
 artifacts:
