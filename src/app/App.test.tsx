@@ -238,4 +238,63 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Confirmar pagamento' })).toBeVisible()
     expect(screen.getByText('Criará uma despesa na conta selecionada.')).toBeVisible()
   })
+
+  it('ends the authenticated session and returns to sign-in', async () => {
+    const user = userEvent.setup()
+    const signOut = vi.fn().mockResolvedValue({ error: null })
+    vi.mocked(getSupabaseClient).mockReturnValue({ auth: { signOut } } as never)
+
+    render(<App initialSession />)
+    await user.click(screen.getByRole('button', { name: 'Sair' }))
+
+    expect(signOut).toHaveBeenCalledWith({ scope: 'local' })
+    expect(screen.getByRole('heading', { name: 'Entre na sua conta' })).toBeVisible()
+  })
+
+  it('keeps sign-out disabled while pending', async () => {
+    const user = userEvent.setup()
+    const request = createDeferred<{ error: null }>()
+    vi.mocked(getSupabaseClient).mockReturnValue({
+      auth: { signOut: vi.fn().mockReturnValue(request.promise) },
+    } as never)
+
+    render(<App initialSession />)
+    await user.click(screen.getByRole('button', { name: 'Sair' }))
+    expect(screen.getByRole('button', { name: 'Saindo…' })).toBeDisabled()
+
+    await act(async () => request.resolve({ error: null }))
+    expect(screen.getByRole('heading', { name: 'Entre na sua conta' })).toBeVisible()
+  })
+
+  it('shows a sign-out error and allows a retry', async () => {
+    const user = userEvent.setup()
+    const signOut = vi.fn()
+      .mockResolvedValueOnce({ error: new Error('temporary') })
+      .mockResolvedValueOnce({ error: null })
+    vi.mocked(getSupabaseClient).mockReturnValue({ auth: { signOut } } as never)
+
+    render(<App initialSession />)
+    await user.click(screen.getByRole('button', { name: 'Sair' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('Não foi possível sair.')
+    expect(screen.getByRole('button', { name: 'Sair' })).toBeEnabled()
+
+    await user.click(screen.getByRole('button', { name: 'Sair' }))
+    expect(signOut).toHaveBeenCalledTimes(2)
+    expect(screen.getByRole('heading', { name: 'Entre na sua conta' })).toBeVisible()
+  })
+
+  it('keeps sign-out visible and retryable from a card statement', async () => {
+    const user = userEvent.setup()
+    const signOut = vi.fn().mockResolvedValue({ error: new Error('temporary') })
+    vi.mocked(getSupabaseClient).mockReturnValue({ auth: { signOut } } as never)
+
+    render(<App initialSession />)
+    await user.click(screen.getByRole('button', { name: 'Ver fatura' }))
+    await user.click(screen.getByRole('button', { name: 'Sair' }))
+
+    expect(signOut).toHaveBeenCalledWith({ scope: 'local' })
+    expect(screen.getByRole('alert')).toHaveTextContent('Não foi possível sair.')
+    expect(screen.getByRole('button', { name: 'Sair' })).toBeEnabled()
+    expect(screen.getByRole('heading', { name: 'R$ 1.248,50' })).toBeVisible()
+  })
 })

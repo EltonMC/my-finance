@@ -36,7 +36,7 @@ export function App({ initialSession = false }: AppProps) {
     return <AuthScreen onSignedIn={() => setAuthenticated(true)} />
   }
 
-  return <FinanceHome />
+  return <FinanceHome onSignedOut={() => setAuthenticated(false)} />
 }
 
 function AuthScreen({ onSignedIn }: { onSignedIn: () => void }) {
@@ -163,17 +163,44 @@ function AuthScreen({ onSignedIn }: { onSignedIn: () => void }) {
   )
 }
 
-function FinanceHome() {
+function FinanceHome({ onSignedOut }: { onSignedOut: () => void }) {
   const [view, setView] = useState<'overview' | 'statement'>('overview')
   const [showPayment, setShowPayment] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
+  const [signOutError, setSignOutError] = useState<string | null>(null)
+
+  async function handleSignOut() {
+    const supabase = getSupabaseClient()
+    if (!supabase) {
+      setSignOutError('Configure o Supabase para sair com segurança.')
+      return
+    }
+
+    setSigningOut(true)
+    setSignOutError(null)
+    try {
+      const { error } = await supabase.auth.signOut({ scope: 'local' })
+      if (error) {
+        setSignOutError('Não foi possível sair. Tente novamente.')
+        return
+      }
+      onSignedOut()
+    } catch {
+      setSignOutError('Não foi possível sair. Confira sua conexão e tente novamente.')
+    } finally {
+      setSigningOut(false)
+    }
+  }
 
   if (view === 'statement') {
     return (
       <main className="app-shell">
         <header className="topbar">
-          <button className="back-button" onClick={() => setView('overview')}>Voltar</button>
+          <button className="back-button" disabled={signingOut} onClick={() => setView('overview')}>Voltar</button>
           <p className="eyebrow">Cartão de crédito</p>
+          <button className="secondary-button" disabled={signingOut} onClick={handleSignOut}>{signingOut ? 'Saindo…' : 'Sair'}</button>
         </header>
+        {signOutError ? <p className="form-error" role="alert">{signOutError}</p> : null}
         <section className="statement-hero" aria-labelledby="statement-title">
           <p className="status">Fatura fechada</p>
           <h1 id="statement-title">R$ 1.248,50</h1>
@@ -199,8 +226,12 @@ function FinanceHome() {
     <main className="app-shell">
       <header className="topbar">
         <div><p className="eyebrow">MyFinance</p><h1>Visão geral</h1></div>
-        <button className="icon-button" aria-label="Adicionar lançamento">+</button>
+        <div className="topbar-actions">
+          <button className="icon-button" aria-label="Adicionar lançamento" disabled={signingOut}>+</button>
+          <button className="secondary-button" disabled={signingOut} onClick={handleSignOut}>{signingOut ? 'Saindo…' : 'Sair'}</button>
+        </div>
       </header>
+      {signOutError ? <p className="form-error" role="alert">{signOutError}</p> : null}
       <section className="attention-card" aria-labelledby="attention-title">
         <p className="eyebrow">Para hoje</p>
         <h2 id="attention-title">1 conta pendente</h2>
