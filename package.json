@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@12.4.1",
   "engines": {
     "node": ">=22"
   },
@@ -10,15 +11,18 @@
     "harness": "node .harness/scripts/harness-cli.mjs",
     "check": "node .harness/scripts/harness-cli.mjs check",
     "test": "vitest run",
-    "test:harness": "node --test .harness/scripts/*.test.mjs",
+    "test:harness": "node --test .harness/scripts/*.test.mjs .harness/hooks/*.test.mjs",
     "test:watch": "vitest",
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "eslint .",
+    "lint": "eslint src eslint.config.js vite.config.ts",
     "typecheck": "tsc -b --pretty false",
-    "docker:dev": "docker compose up --build app",
-    "docker:test": "docker compose run --rm --build test",
-    "docker:build": "docker compose run --rm --build build"
+    "verify": "node .harness/scripts/harness-cli.mjs verify",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:test": "supabase test db",
+    "db:lint": "supabase db lint --level warning --fail-on warning"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

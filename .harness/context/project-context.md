@@ -1,34 +1,19 @@
 # Project Context
 
+Product-owned: Harness updates never overwrite this file. Harness-wide technology and invariants live in `harness-baseline.md`.
+
 ## Product
 
 MyFinance is a private, Brazilian-Portuguese, mobile-first personal-finance ledger. One authenticated person records checking accounts, categorized account transactions, pending monthly bills, credit-card statements, installments, chargebacks, full statement payments, and expected reward points. Bank synchronization, partial payments, interest, and live FX rates are out of scope for the first delivery.
 
-## Technology baseline
+## Project-specific rules for agents
 
-- React + Vite frontend, built as a static single-page application (SPA).
-- Cloudflare Workers Static Assets hosts the frontend. Static requests must remain static and do not need a Worker invocation.
-- Supabase provides database, authentication, storage, and server-side capabilities when needed.
-- Supabase Edge Functions are the default boundary for privileged backend logic. A Cloudflare Worker is added only for a specific edge/server responsibility, such as server-rendering or dynamic metadata.
-- TypeScript is the default for application code unless a documented decision changes it.
-- The Harness control plane runs on the current supported Node.js 22 LTS line. Its `package.json` declares the accepted major range.
-- Docker Compose is the local development and CI execution boundary. Production stays a Cloudflare static-asset deployment, built and verified in containers before CI deploys it.
+- Financial data is private to its authenticated owner. Every client-exposed table requires explicit grants, RLS, and allow/deny coverage.
+- The browser receives only the Supabase URL and publishable key; service-role credentials stay outside the client and repository.
+- Product-facing copy is Brazilian Portuguese. Source code, tests, technical logs, and developer-facing artifacts are English.
 
-## Engineering invariants
+## Decisions already made
 
-- Source code, identifiers, file and directory names, database/API names, tests, code comments, technical logs, and developer-facing errors are written in English.
-- User-facing copy follows the documented product locale. Keep translation keys and the code that selects localized copy in English.
-- Database changes are represented by repeatable migrations.
-- Every client-exposed table has explicit grants, RLS policies, and allow/deny tests for applicable operations.
-- Secrets and Supabase service credentials stay server-side.
-- The browser may receive only public build-time configuration, such as the Supabase URL and publishable client credential. It never receives `service_role` or another privileged secret.
-- Feature work has an acceptance-focused work item and verification evidence.
-- Every feature follows red-green-refactor TDD, with failure and passing-test evidence in its work item.
-- All changes flow through a feature branch and pull request. `main` is protected; only CI deploys to production after the approved PR is merged.
-- Every database construction or alteration has an approved DBA review. Versioned migrations are canonical; the data dictionary records why each durable entity exists so semantic duplicates can be identified before implementation.
-- `.harness/memory/` is a task-scoped LLM Wiki. Query it by topic and update only durable, verified knowledge.
-
-## Decisions to make before implementation
-
-1. Pin generated starter dependencies and add actual build, test, type-check, E2E, and deploy commands to `.harness/harness.yaml`.
-2. Configure a non-secret Supabase project URL and publishable key for browser integration after the local schema and tests are verified.
+1. The initial user journey is an authenticated person recording and reviewing private everyday finances on a phone.
+2. The tenant boundary is one Supabase Auth user per private financial ledger.
+3. Authorization is documented in `access-matrix.md`; database changes use repeatable migrations and an approved DBA review.
