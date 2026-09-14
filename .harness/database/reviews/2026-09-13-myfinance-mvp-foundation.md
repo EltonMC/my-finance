@@ -2,7 +2,7 @@
 
 ## Verdict
 
-`APPROVE WITH CONDITIONS`
+`APPROVE`
 
 ## Plain-language summary
 
@@ -27,12 +27,12 @@ The proposed first schema is additive, has a clear per-user boundary, and separa
 - [x] Public exposure, grants, RLS, views, functions, triggers, RPCs, and Storage were assessed where applicable.
 - [x] Migration is compatible, has lock/backfill assessment, and has rollback or forward-fix handling.
 - [x] Local reset, database lint, and the public-schema RLS pgTAP guard passed on 2026-09-14.
-- [ ] Operation-specific RLS allow/deny and command-RPC tests remain required before product review.
+- [x] Operation-specific RLS allow/deny and command-RPC tests passed locally on 2026-09-14: 98 tests cover all anonymous table operations, owner access, second-user and relationship isolation, direct manual transactions, archived-row immutability, all eight RPCs, and duplicate-command safety.
 
 ## Final evidence
 
 - Proposal: `.harness/database/changes/2026-09-13-myfinance-mvp-foundation.md`
-- Migration(s): `supabase/migrations/20260913214357_initial-finance.sql`.
-- Commands and results: local `pnpm db:reset` applied `20260913214357_initial-finance.sql`; `pnpm db:lint` reported no schema errors; `pnpm db:test` passed the public-schema RLS guard. The PL/pgSQL installment function uses an explicitly typed empty UUID array and its loop variable is no longer shadowed, so lint has no warnings.
-- Reviewer: Harness Database Steward.
-- Review date: 2026-09-13.
+- Migration(s): `supabase/migrations/20260913214357_initial-finance.sql`; `supabase/migrations/20260914162848_revoke_anonymous_finance_access.sql`.
+- Commands and results: local `pnpm db:reset` applied both migrations; `pnpm db:test` passed 98 tests in two files; `pnpm db:lint` reported no schema errors; `supabase db advisors --local` reported no issues. The operation-specific tests first failed against broad Supabase default grants. Fresh-context review then exposed six coverage or policy gaps, all patched and re-run successfully; the second migration now explicitly enforces the intended least-privilege access matrix.
+- Reviewer: Harness Database Steward; fresh-context security verification by the Harness review flow.
+- Initial review date: 2026-09-13. Final evidence review date: 2026-09-14.

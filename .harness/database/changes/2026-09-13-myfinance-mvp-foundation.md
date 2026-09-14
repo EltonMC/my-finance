@@ -23,17 +23,17 @@
 ## Access and queries
 
 - Tenant or ownership boundary: `user_id = auth.uid()`.
-- Public API exposure, grants, RLS policies, Storage, RPC, view, function, or trigger impact: browser reads owner rows through RLS. Browser creates/edits configuration through RLS. Multi-record actions use explicitly granted, ownership-checking RPCs; no Storage or Edge Function.
+- Public API exposure, grants, RLS policies, Storage, RPC, view, function, or trigger impact: browser reads owner rows through RLS. Browser creates/edits configuration through RLS. Multi-record actions use explicitly granted, ownership-checking RPCs; no Storage or Edge Function. The follow-up migration `20260914162848_revoke_anonymous_finance_access.sql` explicitly removes Supabase default privileges from `anon`, removes direct mutation privileges for immutable event tables, and removes direct deletion for configuration rows that use archival lifecycles.
 - Expected read, write, join, filter, and sort paths: user-owned account/card/category lists; account event history by account/date; statements by card/closing date; events by statement/date; recurring occurrences by rule/month; payments by statement.
 - Proposed indexes and read/write trade-off: index each `user_id`; indexes on foreign keys used by statements/events/payments/occurrences; compound `(credit_card_id, closing_date)` and `(recurring_bill_id, occurrence_month)` to support lists and unique lifecycle. These indexes add modest write cost but support RLS filtering and the listed daily reads.
 
 ## Migration and release plan
 
-- Migration shape: additive initial schema.
+- Migration shape: additive initial schema followed by a least-privilege hardening migration; no table or data is removed.
 - Compatibility with the prior application version: no prior application schema.
 - Lock, volume, and backfill risk: no existing rows; short DDL locks only.
 - Rollback or forward-fix plan: do not rollback by dropping financial tables after local data exists; correct migration defects with a forward additive migration. Before release, the schema has no production data.
-- Test plan: local reset, `supabase db lint`, pgTAP integrity and RLS allow/deny tests, RPC duplicate/ownership integration tests, and query-plan review for the listed index paths.
+- Test plan: local reset, `supabase db lint`, local database advisors, pgTAP integrity and operation-specific RLS allow/deny tests, RPC duplicate/ownership integration tests, and query-plan review for the listed index paths.
 
 ## Owner approval
 
