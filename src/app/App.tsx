@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { getSupabaseClient } from '../shared/supabase'
 import './app.css'
@@ -20,64 +20,144 @@ export function App({ initialSession = false }: AppProps) {
       return
     }
 
-    void supabase.auth.getSession().then(({ data }) => setAuthenticated(Boolean(data.session)))
+    let active = true
+    void supabase.auth.getSession().then(({ data }) => {
+      if (active && data.session) {
+        setAuthenticated(true)
+      }
+    })
+
+    return () => {
+      active = false
+    }
   }, [initialSession])
 
   if (!authenticated) {
-    return <SignIn onSignedIn={() => setAuthenticated(true)} />
+    return <AuthScreen onSignedIn={() => setAuthenticated(true)} />
   }
 
   return <FinanceHome />
 }
 
-function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
+function AuthScreen({ onSignedIn }: { onSignedIn: () => void }) {
+  const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in')
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const titleRef = useRef<HTMLHeadingElement>(null)
+  const previousMode = useRef(mode)
+
+  const isSignUp = mode === 'sign-up'
+
+  useEffect(() => {
+    if (previousMode.current !== mode) {
+      titleRef.current?.focus()
+      previousMode.current = mode
+    }
+  }, [mode])
+
+  function changeMode(nextMode: 'sign-in' | 'sign-up') {
+    setMode(nextMode)
+    setError(null)
+    setSuccess(null)
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const values = new FormData(event.currentTarget)
+    const name = String(values.get('name') ?? '').trim()
     const supabase = getSupabaseClient()
 
+    if (isSignUp && !name) {
+      setError('Informe seu nome.')
+      return
+    }
+
     if (!supabase) {
-      setError('Configure o Supabase para entrar.')
+      setError(isSignUp ? 'Configure o Supabase para criar sua conta.' : 'Configure o Supabase para entrar.')
       return
     }
 
     setSubmitting(true)
     setError(null)
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: String(values.get('email')),
-      password: String(values.get('password')),
-    })
-    setSubmitting(false)
+    setSuccess(null)
 
-    if (signInError) {
-      setError('Não foi possível entrar. Confira seus dados e tente novamente.')
-      return
+    try {
+      if (isSignUp) {
+        const { data, error: signUpError } = await supabase.auth.signUp({
+          email: String(values.get('email')),
+          password: String(values.get('password')),
+          options: { data: { name } },
+        })
+
+        if (signUpError) {
+          setError('Não foi possível criar sua conta. Confira seus dados e tente novamente.')
+          return
+        }
+
+        if (data.session) {
+          onSignedIn()
+          return
+        }
+
+        setSuccess('Conta criada. Confira seu e-mail para confirmar o cadastro e depois entre.')
+        setMode('sign-in')
+        return
+      }
+
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: String(values.get('email')),
+        password: String(values.get('password')),
+      })
+
+      if (signInError) {
+        setError('Não foi possível entrar. Confira seus dados e tente novamente.')
+        return
+      }
+
+      onSignedIn()
+    } catch {
+      setError(isSignUp
+        ? 'Não foi possível criar sua conta. Confira sua conexão e tente novamente.'
+        : 'Não foi possível entrar. Confira sua conexão e tente novamente.')
+    } finally {
+      setSubmitting(false)
     }
-
-    onSignedIn()
   }
 
   return (
     <main className="auth-shell">
-      <section className="auth-card" aria-labelledby="sign-in-title">
+      <section className="auth-card" aria-labelledby="auth-title">
         <p className="eyebrow">MyFinance</p>
-        <h1 id="sign-in-title">Entre na sua conta</h1>
-        <p className="muted">Organize suas contas e faturas em um só lugar.</p>
-        <form onSubmit={handleSubmit} className="form-stack">
+        <h1 id="auth-title" ref={titleRef} tabIndex={-1}>{isSignUp ? 'Crie sua conta' : 'Entre na sua conta'}</h1>
+        <p className="muted">{isSignUp ? 'Comece com apenas seus dados essenciais.' : 'Organize suas contas e faturas em um só lugar.'}</p>
+        <form key={mode} onSubmit={handleSubmit} className="form-stack" aria-label={isSignUp ? 'Criar conta' : 'Entrar'}>
+          {isSignUp ? (
+            <label>
+              Nome
+              <input name="name" type="text" autoComplete="name" required />
+            </label>
+          ) : null}
           <label>
             E-mail
             <input name="email" type="email" autoComplete="email" required />
           </label>
           <label>
             Senha
-            <input name="password" type="password" autoComplete="current-password" required />
+            <input name="password" type="password" autoComplete={isSignUp ? 'new-password' : 'current-password'} required />
           </label>
           {error ? <p className="form-error" role="alert">{error}</p> : null}
-          <button type="submit" disabled={submitting}>{submitting ? 'Entrando…' : 'Entrar'}</button>
+          {success ? <p className="form-success" role="status">{success}</p> : null}
+          <button type="submit" disabled={submitting}>
+            {isSignUp ? (submitting ? 'Criando conta…' : 'Criar minha conta') : (submitting ? 'Entrando…' : 'Entrar')}
+          </button>
         </form>
+        <p className="auth-alternate">
+          {isSignUp ? 'Já tem uma conta?' : 'Ainda não tem uma conta?'}
+          <button type="button" className="auth-mode-button" disabled={submitting} onClick={() => changeMode(isSignUp ? 'sign-in' : 'sign-up')}>
+            {isSignUp ? 'Entrar' : 'Criar conta'}
+          </button>
+        </p>
       </section>
     </main>
   )

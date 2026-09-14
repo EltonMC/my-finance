@@ -17,6 +17,7 @@ Ship the first secure, mobile-first MyFinance slice with an authenticated React/
 ## Acceptance criteria
 
 - [ ] The implementation satisfies FR-001 through FR-032 and NFR-001 through NFR-005 from the approved handoff.
+- [ ] User-account creation requests only name, email, and password; login requests email and password.
 - [ ] Private user data is protected with RLS allow and deny tests.
 - [ ] Every defined multi-record financial mutation is atomic and cannot create duplicate payment or recurring-bill records.
 - [ ] The main flows work at a 320px viewport with accessible labels and keyboard behavior.
@@ -53,4 +54,4 @@ Ship the first secure, mobile-first MyFinance slice with an authenticated React/
 - Review findings and disposition: database pre-review is `APPROVE WITH CONDITIONS`; independent implementation review is pending.
 - Remaining risks: operation-specific pgTAP owner-allow and second-user-deny coverage for each client action remains required before a product PR. A Supabase URL and publishable key are also required for a live browser login.
 - Independent-review evidence or proportional exception: required before PR.
-- Course-correction record: not needed.
+- Course-correction record: on 2026-09-14, the owner amended FR-001 so user-account creation asks for only name, email, and password; the product brief, PRD, approved handoff, and acceptance criteria were reconciled before authentication implementation.
