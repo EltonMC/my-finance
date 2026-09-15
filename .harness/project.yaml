@@ -7,4 +7,4 @@ commands:
   typecheck: pnpm typecheck
   test: pnpm test
   build: pnpm build
-  e2e: unset
+  e2e: pnpm test:e2e
