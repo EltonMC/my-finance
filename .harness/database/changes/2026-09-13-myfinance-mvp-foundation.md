@@ -39,3 +39,8 @@
 
 - Product or domain decision owner: Elton Carvalho.
 - Approved to implement on: 2026-09-13 (scope approved; remote schema execution remains unapproved).
+
+### Aprovação
+
+- Aprovado por (nome e data): Elton Carvalho, 2026-09-15 (confirmação na conversa com o agente do escopo aprovado em 2026-09-13)
+- Aprovação de mudança que apaga ou reescreve dados (nome e data): Elton Carvalho, 2026-09-15 (remoção das políticas de acesso anônimo em 20260914162848_revoke_anonymous_finance_access.sql; nenhum dado apagado)

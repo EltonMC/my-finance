@@ -32,7 +32,7 @@ The proposed first schema is additive, has a clear per-user boundary, and separa
 ## Final evidence
 
 - Proposal: `.harness/database/changes/2026-09-13-myfinance-mvp-foundation.md`
-- Migration(s): `supabase/migrations/20260913214357_initial-finance.sql`; `supabase/migrations/20260914162848_revoke_anonymous_finance_access.sql`.
+- Migration(s): `supabase/migrations/20260913214357_initial_finance.sql`; `supabase/migrations/20260914162848_revoke_anonymous_finance_access.sql`.
 - Commands and results: local `pnpm db:reset` applied both migrations; `pnpm db:test` passed 98 tests in two files; `pnpm db:lint` reported no schema errors; `supabase db advisors --local` reported no issues. The operation-specific tests first failed against broad Supabase default grants. Fresh-context review then exposed six coverage or policy gaps, all patched and re-run successfully; the second migration now explicitly enforces the intended least-privilege access matrix.
 - Reviewer: Harness Database Steward; fresh-context security verification by the Harness review flow.
 - Initial review date: 2026-09-13. Final evidence review date: 2026-09-14.
