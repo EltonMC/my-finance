@@ -38,7 +38,7 @@ A person can delete their account and every financial record they own is erased;
 
 ## Evidence
 
-- Files changed: proposal (owner approved 2026-09-15), DBA review, migration `20260915222036_harness_040_database_adequation.sql`, `supabase/tests/account_deletion_test.sql`, access matrix and data dictionary table names, rename of `20260913214357_initial-finance.sql` to `_initial_finance.sql` (version unchanged, not on `main`), owner approval lines on the two earlier proposals (confirmed 2026-09-15), `supabase/config.toml` Auth hardening with a sign-up password-rules hint, `public/_headers` and `src/security-headers.test.ts` from the template.
+- Files changed: proposal (owner approved 2026-09-15), DBA review, migration `20260915222036_harness_040_database_adequation.sql`, `supabase/tests/account_deletion_test.sql`, access matrix and data dictionary table names, the published `20260913214357_initial-finance.sql` left untouched (the guard forbids renaming or editing a published migration; its hyphenated description still applies cleanly and `db:test` proves Supabase applies it), owner approval lines on the two earlier proposals (confirmed 2026-09-15), `supabase/config.toml` Auth hardening with a sign-up password-rules hint, `public/_headers` and `src/security-headers.test.ts` from the template.
 - Red: `pnpm db:test` → "a person with financial history can delete their account" died on `checking_accounts_user_id_fkey` (restrict); `pnpm test -- src/app/App.test.tsx` → password field had no accessible description.
 - Green: `pnpm db:test` → PASS, 113 tests in five files (inter-table `restrict` keys did not block the cascade); `pnpm test` → 40 passed.
 - Verify: `npm run harness -- verify` → Tudo verde.

@@ -324,7 +324,8 @@ declare
   v_event_cents integer;
   v_statement_id uuid;
   v_event_id uuid;
-  v_event_ids uuid[] := array[]::uuid[];
+  v_index integer;
+  v_event_ids uuid[] := '{}';
   v_occurrence_date date;
 begin
   if v_user_id is null then raise exception 'Authentication is required.' using errcode = '42501'; end if;
