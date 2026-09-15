@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(97);
+select plan(99);
 
 insert into auth.users (id, email) values
   ('00000000-0000-4000-8000-000000000001', 'owner1@example.test'),
@@ -115,9 +115,9 @@ select results_eq(
     order by resource
   $$,
   $$ values
-    ('account_categories', 1::bigint, 0::bigint),
+    ('account_categories', 9::bigint, 0::bigint),
     ('account_transactions', 1::bigint, 0::bigint),
-    ('card_categories', 1::bigint, 0::bigint),
+    ('card_categories', 8::bigint, 0::bigint),
     ('card_events', 2::bigint, 0::bigint),
     ('card_statements', 3::bigint, 0::bigint),
     ('checking_accounts', 1::bigint, 0::bigint),
@@ -155,6 +155,8 @@ select results_eq($$ update public.checking_accounts set archived_at = now() whe
 select is_empty($$ update public.checking_accounts set name = 'Reactivated account', archived_at = null where name = 'Renamed account' returning id $$, 'owner cannot edit or reactivate an archived checking account');
 select results_eq($$ update public.account_categories set archived_at = now() where name = 'Renamed account category' returning name $$, $$ values ('Renamed account category'::text) $$, 'owner archives an active account category');
 select is_empty($$ update public.account_categories set name = 'Reactivated account category', archived_at = null where name = 'Renamed account category' returning id $$, 'owner cannot edit or reactivate an archived account category');
+select throws_matching($$ insert into public.account_transactions (user_id, checking_account_id, account_category_id, transaction_type, description, amount_cents, occurred_on) select '00000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001', id, 'expense', 'Archived category expense', 1000, '2026-02-12' from public.account_categories where name = 'Renamed account category' $$, 'active account category', 'manual transactions reject an archived category');
+select throws_matching($$ insert into public.recurring_bills (user_id, checking_account_id, account_category_id, description, amount_cents, due_day, start_date) select '00000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001', id, 'Archived category bill', 1000, 8, '2026-02-01' from public.account_categories where name = 'Renamed account category' $$, 'active account category', 'recurring bills reject an archived category');
 select results_eq($$ update public.credit_cards set archived_at = now() where name = 'Renamed card' returning name $$, $$ values ('Renamed card'::text) $$, 'owner archives an active credit card');
 select is_empty($$ update public.credit_cards set name = 'Reactivated card', archived_at = null where name = 'Renamed card' returning id $$, 'owner cannot edit or reactivate an archived credit card');
 select results_eq($$ update public.card_categories set archived_at = now() where name = 'Renamed card category' returning name $$, $$ values ('Renamed card category'::text) $$, 'owner archives an active card category');
@@ -171,10 +173,10 @@ select is_empty($$ update public.card_categories set name = 'Hacked card categor
 select throws_matching($$ insert into public.recurring_bills (user_id, checking_account_id, account_category_id, description, amount_cents, due_day, start_date) values ('00000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000002', 'Foreign bill', 3000, 7, '2026-02-01') $$, 'row-level security', 'owner cannot create a recurring bill for another user');
 select is_empty($$ update public.recurring_bills set description = 'Hacked bill' where id = '50000000-0000-4000-8000-000000000002' returning id $$, 'owner cannot update another user recurring bill');
 select throws_matching($$ insert into public.account_transactions (user_id, checking_account_id, account_category_id, transaction_type, description, amount_cents, occurred_on) values ('00000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000002', 'income', 'Foreign manual income', 1000, '2026-02-10') $$, 'row-level security', 'owner cannot create a manual transaction for another user');
-select throws_matching($$ insert into public.recurring_bills (user_id, checking_account_id, account_category_id, description, amount_cents, due_day, start_date) values ('00000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000001', 'Foreign account link', 3000, 7, '2026-02-01') $$, 'foreign key constraint', 'owner cannot create a recurring bill with another user account');
-select throws_matching($$ insert into public.recurring_bills (user_id, checking_account_id, account_category_id, description, amount_cents, due_day, start_date) values ('00000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000002', 'Foreign category link', 3000, 7, '2026-02-01') $$, 'foreign key constraint', 'owner cannot create a recurring bill with another user category');
-select throws_matching($$ update public.recurring_bills set checking_account_id = '10000000-0000-4000-8000-000000000002' where id = '50000000-0000-4000-8000-000000000001' $$, 'foreign key constraint', 'owner cannot update a recurring bill to another user account');
-select throws_matching($$ update public.recurring_bills set account_category_id = '20000000-0000-4000-8000-000000000002' where id = '50000000-0000-4000-8000-000000000001' $$, 'foreign key constraint', 'owner cannot update a recurring bill to another user category');
+select throws_matching($$ insert into public.recurring_bills (user_id, checking_account_id, account_category_id, description, amount_cents, due_day, start_date) values ('00000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000001', 'Foreign account link', 3000, 7, '2026-02-01') $$, 'active checking account', 'owner cannot create a recurring bill with another user account');
+select throws_matching($$ insert into public.recurring_bills (user_id, checking_account_id, account_category_id, description, amount_cents, due_day, start_date) values ('00000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000002', 'Foreign category link', 3000, 7, '2026-02-01') $$, 'active account category', 'owner cannot create a recurring bill with another user category');
+select throws_matching($$ update public.recurring_bills set checking_account_id = '10000000-0000-4000-8000-000000000002' where id = '50000000-0000-4000-8000-000000000001' $$, 'active checking account', 'owner cannot update a recurring bill to another user account');
+select throws_matching($$ update public.recurring_bills set account_category_id = '20000000-0000-4000-8000-000000000002' where id = '50000000-0000-4000-8000-000000000001' $$, 'active account category', 'owner cannot update a recurring bill to another user category');
 
 select ok(public.create_card_purchase('30000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001', 'Allowed purchase', 1000, '2026-06-01') is not null, 'owner creates a card purchase command');
 select is(cardinality(public.create_installment_purchase('30000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001', 'Allowed installment', 2001, 2::smallint, '2026-07-01')), 2, 'owner creates every installment atomically');

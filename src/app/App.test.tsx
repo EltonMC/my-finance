@@ -5,6 +5,15 @@ import { getSupabaseClient } from '../shared/supabase'
 import { App } from './App'
 
 vi.mock('../shared/supabase', () => ({ getSupabaseClient: vi.fn() }))
+vi.mock('../data/finance-repository', () => ({
+  archiveCategory: vi.fn(),
+  archiveCheckingAccount: vi.fn(),
+  createCategory: vi.fn(),
+  createCheckingAccount: vi.fn(),
+  loadFinanceOverview: vi.fn().mockResolvedValue({ accounts: [], accountCategories: [], cardCategories: [] }),
+  renameCategory: vi.fn(),
+  updateCheckingAccount: vi.fn(),
+}))
 
 beforeEach(() => {
   vi.mocked(getSupabaseClient).mockReturnValue(null)
@@ -44,15 +53,48 @@ describe('App', () => {
     expect(form.querySelectorAll('input')).toHaveLength(3)
     await user.type(screen.getByLabelText('Nome'), 'Ana Souza')
     await user.type(screen.getByLabelText('E-mail'), 'ana@example.com')
-    await user.type(screen.getByLabelText('Senha'), 'safe-password')
+    await user.type(screen.getByLabelText('Senha'), 'Safe-password1')
     await user.click(screen.getByRole('button', { name: 'Criar minha conta' }))
 
     expect(signUp).toHaveBeenCalledWith({
       email: 'ana@example.com',
-      password: 'safe-password',
+      password: 'Safe-password1',
       options: { data: { name: 'Ana Souza' } },
     })
     expect(screen.getByRole('heading', { name: 'Visão geral' })).toBeVisible()
+  })
+
+  it('explains the password rules before a user account is created', async () => {
+    const user = userEvent.setup()
+    vi.mocked(getSupabaseClient).mockReturnValue({
+      auth: { getSession: vi.fn().mockResolvedValue({ data: { session: null } }) },
+    } as never)
+
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: 'Criar conta' }))
+
+    const password = screen.getByLabelText('Senha')
+    expect(password).toHaveAccessibleDescription('Use pelo menos 10 caracteres, com letras maiúsculas, minúsculas e números.')
+    expect(password).toHaveAttribute('minLength', '10')
+  })
+
+  it.each(['Short1a', 'lowercase-only1', 'UPPERCASE-ONLY1', 'No-digits-here'])('rejects the weak password %s before calling Supabase', async (weakPassword) => {
+    const user = userEvent.setup()
+    const signUp = vi.fn()
+    vi.mocked(getSupabaseClient).mockReturnValue({
+      auth: { getSession: vi.fn().mockResolvedValue({ data: { session: null } }), signUp },
+    } as never)
+
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: 'Criar conta' }))
+    await user.type(screen.getByLabelText('Nome'), 'Ana Souza')
+    await user.type(screen.getByLabelText('E-mail'), 'ana@example.com')
+    await user.type(screen.getByLabelText('Senha'), weakPassword)
+    await user.click(screen.getByRole('button', { name: 'Criar minha conta' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent('A senha precisa ter pelo menos 10 caracteres, com letras maiúsculas, minúsculas e números.')
+    expect(screen.getByLabelText('Senha')).toHaveAttribute('aria-invalid', 'true')
+    expect(signUp).not.toHaveBeenCalled()
   })
 
   it('shows a registration error and keeps retry available', async () => {
@@ -71,7 +113,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Criar conta' }))
     await user.type(screen.getByLabelText('Nome'), 'Ana Souza')
     await user.type(screen.getByLabelText('E-mail'), 'ana@example.com')
-    await user.type(screen.getByLabelText('Senha'), 'safe-password')
+    await user.type(screen.getByLabelText('Senha'), 'Safe-password1')
     await user.click(screen.getByRole('button', { name: 'Criar minha conta' }))
 
     expect(screen.getByRole('alert')).toHaveTextContent('Não foi possível criar sua conta.')
@@ -95,7 +137,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Criar conta' }))
     await user.type(screen.getByLabelText('Nome'), 'Ana Souza')
     await user.type(screen.getByLabelText('E-mail'), 'ana@example.com')
-    await user.type(screen.getByLabelText('Senha'), 'safe-password')
+    await user.type(screen.getByLabelText('Senha'), 'Safe-password1')
     await user.click(screen.getByRole('button', { name: 'Criar minha conta' }))
 
     expect(screen.getByRole('alert')).toHaveTextContent('Confira sua conexão')
@@ -116,7 +158,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Criar conta' }))
     await user.type(screen.getByLabelText('Nome'), 'Ana Souza')
     await user.type(screen.getByLabelText('E-mail'), 'ana@example.com')
-    await user.type(screen.getByLabelText('Senha'), 'safe-password')
+    await user.type(screen.getByLabelText('Senha'), 'Safe-password1')
     await user.click(screen.getByRole('button', { name: 'Criar minha conta' }))
 
     expect(screen.getByRole('button', { name: 'Criando conta…' })).toBeDisabled()
@@ -140,7 +182,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Criar conta' }))
     await user.type(screen.getByLabelText('Nome'), '   ')
     await user.type(screen.getByLabelText('E-mail'), 'ana@example.com')
-    await user.type(screen.getByLabelText('Senha'), 'safe-password')
+    await user.type(screen.getByLabelText('Senha'), 'Safe-password1')
     await user.click(screen.getByRole('button', { name: 'Criar minha conta' }))
 
     expect(screen.getByRole('alert')).toHaveTextContent('Informe seu nome.')
@@ -160,7 +202,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Criar conta' }))
     await user.type(screen.getByLabelText('Nome'), 'Ana Souza')
     await user.type(screen.getByLabelText('E-mail'), 'ana@example.com')
-    await user.type(screen.getByLabelText('Senha'), 'safe-password')
+    await user.type(screen.getByLabelText('Senha'), 'Safe-password1')
     await user.click(screen.getByRole('button', { name: 'Criar minha conta' }))
 
     expect(screen.getByRole('heading', { name: 'Entre na sua conta' })).toHaveFocus()
@@ -184,10 +226,10 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Entrar' }))
     expect(screen.getByRole('heading', { name: 'Entre na sua conta' })).toHaveFocus()
     await user.type(screen.getByLabelText('E-mail'), 'ana@example.com')
-    await user.type(screen.getByLabelText('Senha'), 'safe-password')
+    await user.type(screen.getByLabelText('Senha'), 'Safe-password1')
     await user.click(screen.getByRole('button', { name: 'Entrar' }))
 
-    expect(signInWithPassword).toHaveBeenCalledWith({ email: 'ana@example.com', password: 'safe-password' })
+    expect(signInWithPassword).toHaveBeenCalledWith({ email: 'ana@example.com', password: 'Safe-password1' })
     expect(screen.getByRole('heading', { name: 'Visão geral' })).toBeVisible()
   })
 
@@ -198,7 +240,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Criar conta' }))
     await user.type(screen.getByLabelText('Nome'), 'Ana Souza')
     await user.type(screen.getByLabelText('E-mail'), 'ana@example.com')
-    await user.type(screen.getByLabelText('Senha'), 'safe-password')
+    await user.type(screen.getByLabelText('Senha'), 'Safe-password1')
     await user.click(screen.getByRole('button', { name: 'Criar minha conta' }))
 
     expect(screen.getByRole('alert')).toHaveTextContent('Configure o Supabase para criar sua conta.')
@@ -218,7 +260,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Criar conta' }))
     await user.type(screen.getByLabelText('Nome'), 'Ana Souza')
     await user.type(screen.getByLabelText('E-mail'), 'ana@example.com')
-    await user.type(screen.getByLabelText('Senha'), 'safe-password')
+    await user.type(screen.getByLabelText('Senha'), 'Safe-password1')
     await user.click(screen.getByRole('button', { name: 'Criar minha conta' }))
     expect(screen.getByRole('heading', { name: 'Visão geral' })).toBeVisible()
 
@@ -226,17 +268,12 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Visão geral' })).toBeVisible()
   })
 
-  it('lets an authenticated user inspect a card statement and its full payment impact', async () => {
-    const user = userEvent.setup()
+  it('does not present simulated debts or card balances as user data', async () => {
     render(<App initialSession />)
 
-    await user.click(screen.getByRole('button', { name: 'Ver fatura' }))
-    expect(screen.getByText('Fecha em 10 de setembro')).toBeVisible()
-    expect(screen.getByText('Vence em 17 de setembro')).toBeVisible()
-
-    await user.click(screen.getByRole('button', { name: 'Pagar fatura' }))
-    expect(screen.getByRole('heading', { name: 'Confirmar pagamento' })).toBeVisible()
-    expect(screen.getByText('Criará uma despesa na conta selecionada.')).toBeVisible()
+    expect(await screen.findByText('Nenhum cartão cadastrado.')).toBeVisible()
+    expect(screen.queryByText('R$ 1.248,50')).not.toBeInTheDocument()
+    expect(screen.queryByText('Internet vence amanhã · R$ 109,90')).not.toBeInTheDocument()
   })
 
   it('ends the authenticated session and returns to sign-in', async () => {
@@ -283,18 +320,18 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Entre na sua conta' })).toBeVisible()
   })
 
-  it('keeps sign-out visible and retryable from a card statement', async () => {
+  it('keeps sign-out visible and retryable from settings', async () => {
     const user = userEvent.setup()
     const signOut = vi.fn().mockResolvedValue({ error: new Error('temporary') })
     vi.mocked(getSupabaseClient).mockReturnValue({ auth: { signOut } } as never)
 
     render(<App initialSession />)
-    await user.click(screen.getByRole('button', { name: 'Ver fatura' }))
+    await user.click(await screen.findByRole('button', { name: 'Ajustes' }))
     await user.click(screen.getByRole('button', { name: 'Sair' }))
 
     expect(signOut).toHaveBeenCalledWith({ scope: 'local' })
     expect(screen.getByRole('alert')).toHaveTextContent('Não foi possível sair.')
     expect(screen.getByRole('button', { name: 'Sair' })).toBeEnabled()
-    expect(screen.getByRole('heading', { name: 'R$ 1.248,50' })).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Ajustes' })).toBeVisible()
   })
 })
