@@ -28,7 +28,7 @@ erDiagram
 
 ### Aprovação
 
-- Aprovado por (nome e data):
+- Aprovado por (nome e data): Elton Carvalho, 2026-09-15 (na conversa com o agente)
 - Aprovação de mudança que apaga ou reescreve dados (nome e data): não se aplica (🟢 só adiciona)
 
 ## Intent
