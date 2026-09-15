@@ -8,13 +8,32 @@ const rulesetName = 'harness-main-protection';
 
 // The application workflows are Harness-managed and report success while no
 // application exists, so the same checks can be required from day one.
-export const requiredChecks = ['Harness checks', 'Quality gate', 'Database gate'];
+export const requiredChecks = ['Harness checks', 'Quality gate', 'Database gate', 'Security scan'];
+
+// Secrets that must live in a GitHub environment. Repository secrets reach every workflow
+// run, including pull request branches an agent can push before any review.
+const environmentSecrets = {
+  SUPABASE_ACCESS_TOKEN: 'production',
+  SUPABASE_DB_PASSWORD: 'production',
+  CLOUDFLARE_API_TOKEN: 'production e preview',
+  CLOUDFLARE_ACCOUNT_ID: 'production e preview',
+};
+
+export function auditRepositorySecrets(names) {
+  return names.filter((name) => environmentSecrets[name]).map((name) => (
+    `O segredo ${name} está no nível do repositório: qualquer branch consegue lê-lo. Mova para o ambiente ${environmentSecrets[name]} (Settings → Environments) e apague a cópia em Settings → Secrets and variables → Actions. Em repositório privado no plano gratuito, environments não guardam segredos: torne o repositório público, use GitHub Pro ou registre o risco em project-context.md.`
+  ));
+}
 
 export function firstRulesetId(output) {
   return output.trim().split(/\s+/)[0] ?? '';
 }
 
-export function buildProtectionPlan({ repository }) {
+// "Protected branches" environments admit every branch when only rulesets (no classic
+// branch protection) exist, so the environments name main explicitly.
+const mainOnly = { protected_branches: false, custom_branch_policies: true };
+
+export function buildProtectionPlan({ repository, reviewerId }) {
   const base = `repos/${repository}`;
   return [
     {
@@ -63,12 +82,47 @@ export function buildProtectionPlan({ repository }) {
     },
     {
       id: 'production-environment',
-      description: 'Criar o ambiente "production" liberado só para branches protegidas',
+      description: 'Criar o ambiente "production" liberado só para a branch main',
       method: 'PUT',
       path: `${base}/environments/production`,
       optional: false,
-      body: { deployment_branch_policy: { protected_branches: true, custom_branch_policies: false } },
+      body: { deployment_branch_policy: mainOnly },
     },
+    {
+      id: 'production-branch-policy',
+      description: 'Permitir que só a main use os segredos de "production"',
+      method: 'BRANCH_POLICY',
+      path: `${base}/environments/production/deployment-branch-policies`,
+      optional: false,
+      body: { name: 'main', type: 'branch' },
+    },
+    {
+      id: 'preview-environment',
+      description: 'Criar o ambiente "preview" para os segredos da prévia (sem acesso ao banco de produção)',
+      method: 'PUT',
+      path: `${base}/environments/preview`,
+      optional: false,
+      body: {},
+    },
+    ...(reviewerId ? [{
+      id: 'destructive-database-environment',
+      description: 'Criar o ambiente "production-destructive": migration que apaga ou reescreve dados espera sua aprovação no GitHub',
+      method: 'PUT',
+      path: `${base}/environments/production-destructive`,
+      optional: true,
+      body: {
+        reviewers: [{ type: 'User', id: reviewerId }],
+        prevent_self_review: false,
+        deployment_branch_policy: mainOnly,
+      },
+    }, {
+      id: 'destructive-database-branch-policy',
+      description: 'Permitir que só a main use o ambiente "production-destructive"',
+      method: 'BRANCH_POLICY',
+      path: `${base}/environments/production-destructive/deployment-branch-policies`,
+      optional: true,
+      body: { name: 'main', type: 'branch' },
+    }] : []),
     {
       id: 'actions-pull-requests',
       description: 'Permitir que o workflow de atualização do Harness abra pull requests (permissões padrão continuam só leitura)',
@@ -100,6 +154,13 @@ export function buildProtectionPlan({ repository }) {
       body: { security_and_analysis: { secret_scanning: { status: 'enabled' }, secret_scanning_push_protection: { status: 'enabled' } } },
     },
     {
+      id: 'private-vulnerability-reporting',
+      description: 'Ativar o relato privado de falhas de segurança (Security → Report a vulnerability)',
+      method: 'PUT',
+      path: `${base}/private-vulnerability-reporting`,
+      optional: true,
+    },
+    {
       id: 'code-scanning',
       description: 'Ativar CodeQL (análise de segurança do código) na configuração padrão',
       method: 'PATCH',
@@ -115,6 +176,11 @@ async function gh(argumentsList, input) {
 }
 
 async function applyStep(step) {
+  if (step.method === 'BRANCH_POLICY') {
+    const existing = await gh(['api', step.path, '--jq', '.branch_policies[].name']);
+    if (existing.code === 0 && existing.stdout.split('\n').includes(step.body.name)) return existing;
+    return gh(['api', '--method', 'POST', step.path, '--input', '-'], JSON.stringify(step.body));
+  }
   if (step.method !== 'RULESET') {
     const argumentsList = ['api', '--method', step.method, step.path];
     if (step.body) argumentsList.push('--input', '-');
@@ -139,9 +205,14 @@ export async function runGithubProtect({ apply = false, print = console.log } = 
   const view = await gh(['repo', 'view', '--json', 'nameWithOwner,visibility']);
   if (view.code !== 0) throw new Error('Este projeto ainda não está no GitHub. Crie com: gh repo create --private --source . --push');
   const { nameWithOwner, visibility } = JSON.parse(view.stdout);
-  const plan = buildProtectionPlan({ repository: nameWithOwner });
+  const user = await gh(['api', 'user', '--jq', '.id']);
+  const reviewerId = user.code === 0 ? Number(user.stdout.trim()) || undefined : undefined;
+  const plan = buildProtectionPlan({ repository: nameWithOwner, reviewerId });
 
   print(`${apply ? 'Aplicando' : 'Plano (nada será alterado)'} — ${nameWithOwner} (${visibility.toLowerCase()})`);
+  const secrets = await gh(['api', `repos/${nameWithOwner}/actions/secrets`, '--jq', '.secrets[].name']);
+  const secretWarnings = secrets.code === 0 ? auditRepositorySecrets(secrets.stdout.split('\n').filter(Boolean)) : [];
+  for (const warning of secretWarnings) print(`  ⚠ ${warning}`);
   if (!apply) {
     for (const step of plan) print(`  • ${step.description}${step.optional ? ' (se o plano do GitHub permitir)' : ''}`);
     print('\nPara aplicar: npm run harness -- github-protect --apply');

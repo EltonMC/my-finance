@@ -237,10 +237,13 @@ function globToRegExp(glob) {
   return new RegExp(`^${glob.replace(/[.+^${}()|\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`);
 }
 
-export function isSecretFileReference(path) {
+export function isSecretFileReference(path, { shell = false } = {}) {
   const name = normalizePath(path).split('/').pop() ?? '';
   if (!name) return false;
   if (/[*?[]/.test(name)) {
+    // Shell wildcards never match a leading dot, so `dir/*` cannot reach `.env`.
+    // Tool globs (ripgrep) can, so the exemption applies to shell words only.
+    if (shell && !name.startsWith('.')) return false;
     const pattern = globToRegExp(name);
     return ['.env', '.env.local', '.env.production', '.envrc', '.dev.vars'].some((candidate) => pattern.test(candidate));
   }
@@ -263,6 +266,7 @@ const guardrailPathPatterns = [
   /^\.harness\/git-hooks\//,
   /^\.github\/workflows\//,
   /^\.github\/dependabot\.yml$/,
+  /^\.harness\/database\/guards\//,
 ];
 
 const secretFileMessage = 'Arquivos .env guardam segredos locais e não devem ser lidos nem alterados pelo agente. Use .env.example e peça para a pessoa preencher o .env.local.';
@@ -271,7 +275,7 @@ const guardrailFileMessage = 'Este arquivo controla as proteções do projeto (h
 
 function classifyWriteTarget(path) {
   const normalized = normalizePath(path);
-  if (isSecretFileReference(normalized)) return deny(secretFileMessage);
+  if (isSecretFileReference(normalized, { shell: true })) return deny(secretFileMessage);
   if (managedPathPatterns.some((pattern) => pattern.test(normalized))) return deny(managedFileMessage);
   if (guardrailPathPatterns.some((pattern) => pattern.test(normalized))) return ask(guardrailFileMessage);
   return allow;
@@ -345,6 +349,91 @@ function isCriticalDeletionTarget(target) {
     || /^\.git\/?$/.test(normalized);
 }
 
+const postgresClients = new Set(['psql', 'pg_dump', 'pg_dumpall', 'pg_restore', 'pgcli']);
+const localDatabaseHost = /^(?:localhost|127\.0\.0\.1|::1|\[::1\]|0\.0\.0\.0|host\.docker\.internal|db|postgres|supabase_db[\w-]*)$/i;
+const remoteDatabaseMessage = 'O agente só acessa o banco local. Produção pode conter dados pessoais e muda só por migrations no CI após o merge.';
+
+// Hosts named through URIs (anywhere in a word, e.g. --dbname=URI), conninfo strings,
+// -h/--host, or PG* variables; `service` names and bare variables cannot be resolved.
+function postgresConnectionTargets(words) {
+  const hosts = [];
+  let unresolved = false;
+  words.forEach((word, index) => {
+    const assignment = word.match(/^(PGHOST|PGHOSTADDR|PGSERVICE)=(.*)$/);
+    if (assignment) {
+      if (assignment[1] === 'PGSERVICE') unresolved = true;
+      else hosts.push(assignment[2]);
+    }
+    for (const uri of word.matchAll(/postgres(?:ql)?:\/\/(?:[^@/\s]*@)?(\[[^\]]+\]|[^:/?,\s]+)/gi)) hosts.push(uri[1]);
+    for (const match of word.matchAll(/(?:^|\s)(?:host|hostaddr)=([^\s]+)/gi)) hosts.push(match[1]);
+    if (/(?:^|\s)service=/i.test(word)) unresolved = true;
+    if (word === '-h' || word === '--host') hosts.push(words[index + 1] ?? '');
+    else if (word.startsWith('--host=')) hosts.push(word.slice(7));
+    else if (/^-h[^-]/.test(word)) hosts.push(word.slice(2));
+    const previous = words[index - 1] ?? '';
+    if (/^\$\{?\w+\}?$/.test(word) && !['-c', '--command', '-f', '--file', '-v', '--variable', 'echo', 'printf'].includes(previous)) unresolved = true;
+  });
+  return { remote: hosts.some((host) => !localDatabaseHost.test(host)), unresolved };
+}
+
+const databaseMcpServer = /(?:supabase|postgres|postgrest|neon|pgsql|mysql|sqlite|(?:^|[_-])(?:pg|db|database|sql)(?:$|[_-]))/i;
+const databaseMcpWrite = /(?:execute|exec|run|sql|query|apply|migration|deploy|create|delete|drop|merge|reset|rebase|pause|restore|update|insert|upsert|write|seed|cost)/i;
+
+export function evaluateMcpTool({ name = '' }) {
+  const [, server = '', ...rest] = name.split('__');
+  const action = rest.join('__');
+  if (!name.startsWith('mcp__') || !databaseMcpServer.test(server)) return allow;
+  const reason = 'Ferramentas MCP que rodam SQL, leem logs ou alteram um projeto de banco remoto estão bloqueadas. ' + remoteDatabaseMessage;
+  if (/(?:^|[_-])logs?(?:$|[_-])/i.test(action)) return deny(reason);
+  if (/^(?:list|search)[_-]/i.test(action)) return allow;
+  return databaseMcpWrite.test(action) ? deny(reason) : allow;
+}
+
+// Commands that send local file contents to another machine. Prompt-injected
+// instructions typically exfiltrate code, data, or secrets this way.
+const localNetworkHost = /^(?:localhost|127\.0\.0\.1|\[?::1\]?|0\.0\.0\.0|host\.docker\.internal)$/i;
+
+function urlHost(value) {
+  const match = value.match(/^[a-z][a-z0-9+.-]*:\/\/(?:[^@/]*@)?(\[[^\]]+\]|[^:/?#]+)/i)
+    ?? value.match(/^((?:[a-z0-9-]+\.)+[a-z]{2,})(?::\d+)?(?:\/|$)/i);
+  return match ? match[1] : null;
+}
+
+const remoteHosts = (args) => args.filter((arg) => !arg.startsWith('-')).map(urlHost).filter(Boolean).filter((host) => !localNetworkHost.test(host));
+
+function sendsLocalFiles(command, args) {
+  if (command === 'curl') {
+    const uploads = args.some((arg, index) => {
+      const next = args[index + 1] ?? '';
+      if (/^(?:--upload-file)$/.test(arg)) return true;
+      if (/^(?:--data|--data-binary|--data-raw|--data-urlencode|--json|--form)$/.test(arg)) return /(?:^|=)@/.test(next);
+      if (/^--(?:data(?:-binary|-urlencode)?|json|form)=.*@/.test(arg)) return true;
+      const cluster = arg.match(/^-([A-Za-z]+)(.*)$/);
+      if (!cluster || arg.startsWith('--')) return false;
+      const [, letters, attached] = cluster;
+      if (letters.includes('T')) return true;
+      const last = letters.at(-1);
+      if (!['d', 'F'].includes(last)) return /[dF]@/.test(arg);
+      return /(?:^|=)@/.test(attached || next);
+    });
+    return uploads && remoteHosts(args).length > 0;
+  }
+  if (command === 'wget') return args.some((arg) => /^--(?:post-file|body-file)/.test(arg)) && remoteHosts(args).length > 0;
+  if (['nc', 'ncat', 'netcat', 'socat', 'telnet'].includes(command)) return args.some((arg) => !arg.startsWith('-') && !/^\d+$/.test(arg) && !localNetworkHost.test(arg));
+  if (['scp', 'rsync', 'sftp'].includes(command)) return args.some((arg) => /^(?:[^@\s/]+@)?[^:\s/]+:/.test(arg) && !/^[a-z]+:\/\//i.test(arg) && !localNetworkHost.test(arg.replace(/^[^@]*@/, '').split(':')[0]));
+  if (command === 'ssh') return args.includes('<');
+  if (command === 'gh') return /^gist (?:create|edit)\b/.test(args.join(' '));
+  return false;
+}
+
+const supabaseValueFlags = new Set(['--workdir', '--profile', '--network-id', '--output', '-o', '--output-format', '--log-level', '--dns-resolver', '--agent']);
+
+function withoutSupabaseGlobalFlags(args) {
+  let index = 0;
+  while (args[index]?.startsWith('-')) index += supabaseValueFlags.has(args[index]) ? 2 : 1;
+  return args.slice(index);
+}
+
 function evaluateSegmentWords(words, context) {
   const { command, args, gitConfig } = normalizeCommand(words);
   const joined = args.join(' ');
@@ -355,14 +444,28 @@ function evaluateSegmentWords(words, context) {
   }
 
   if (command === 'supabase') {
+    const subcommand = withoutSupabaseGlobalFlags(args).join(' ');
     const remoteDatabaseUrl = args.some((arg, index) => {
       const value = arg === '--db-url' ? args[index + 1] : arg.startsWith('--db-url=') ? arg.slice(9) : null;
       return value && /@(?!(?:localhost|127\.0\.0\.1|host\.docker\.internal)[:/])/.test(value);
     });
-    if (/^(?:db push|link|functions deploy|secrets (?:set|unset)|projects delete|branches (?:delete|create)|migration repair|storage rm)\b/.test(joined)
-      || (/^db reset\b/.test(joined) && args.includes('--linked')) || remoteDatabaseUrl) {
+    if (/^(?:db push|link|functions deploy|secrets (?:set|unset)|projects delete|branches (?:delete|create)|migration repair|storage rm)\b/.test(subcommand)
+      || (/^db reset\b/.test(subcommand) && args.includes('--linked')) || remoteDatabaseUrl) {
       return deny('Mudanças no Supabase remoto acontecem só pelo CI após o merge. Use o Supabase local.');
     }
+    const remoteProject = args.some((arg) => arg === '--linked' || arg === '--project-ref' || arg.startsWith('--project-ref='));
+    if ((remoteProject && /^(?:db (?:query|diff)|test db|inspect|migration (?:up|down|squash)|seed)\b/.test(subcommand))
+      || (/^db dump\b/.test(subcommand) && !args.includes('--local'))) {
+      return deny(remoteDatabaseMessage);
+    }
+    if (/^db pull\b/.test(subcommand)) return ask('Este comando lê o schema do banco remoto. Confirme com a pessoa antes.');
+  }
+
+  const onlyAssignments = command === 'export' || (command === '' && words.some((word) => /^[A-Za-z_]\w*=/.test(word)));
+  if (postgresClients.has(command) || onlyAssignments) {
+    const { remote, unresolved } = postgresConnectionTargets(words);
+    if (remote) return deny(remoteDatabaseMessage);
+    if (unresolved) return ask('Não dá para saber se esta conexão com o banco é local. Confirme com a pessoa antes.');
   }
 
   if (command === 'wrangler' && /^(?:deploy|publish|versions (?:deploy|upload)|rollback|secret (?:put|delete|bulk)|delete|pages deploy|d1 execute\b.*--remote)\b/.test(joined)) {
@@ -375,6 +478,10 @@ function evaluateSegmentWords(words, context) {
       || (/^api\b/.test(joined) && args.some((arg, index) => /^(?:-X|--method)$/.test(arg) && /^(?:DELETE|PUT|PATCH|POST)$/i.test(args[index + 1] ?? '')))) {
       return ask('Este comando altera configurações do GitHub. Confirme com a pessoa antes.');
     }
+  }
+
+  if (sendsLocalFiles(command, args)) {
+    return ask('Este comando envia arquivos locais para outro computador. Confirme com a pessoa: conteúdo externo pode ter instruído o agente a vazar código ou dados.');
   }
 
   if (packageManagers.has(command) && args[0] === 'publish') return deny('Publicar pacotes não faz parte deste projeto.');
@@ -391,7 +498,7 @@ function evaluateSegmentWords(words, context) {
   const copyFromExamples = isCopy && operands.slice(0, -1).every((operand) => /\.(?:example|sample|template)$/i.test(operand));
   for (let index = 1; index < words.length; index += 1) {
     if (copyFromExamples && index === words.length - 1) continue;
-    if (!['>', '>>', '<'].includes(words[index]) && isSecretFileReference(words[index])) return deny(secretFileMessage);
+    if (!['>', '>>', '<'].includes(words[index]) && isSecretFileReference(words[index], { shell: true })) return deny(secretFileMessage);
   }
 
   // Writes through the shell follow the file-edit policy.
@@ -467,6 +574,9 @@ export function evaluateFileEdit({ path, content = '' }, context = {}) {
   const normalizedPath = normalizePath(path);
   if (isSecretFileReference(normalizedPath)) return deny(secretFileMessage);
   if (managedPathPatterns.some((pattern) => pattern.test(normalizedPath))) return deny(managedFileMessage);
+  if (context.publishedMigration && /^supabase\/migrations\/.+\.sql$/.test(normalizedPath)) {
+    return deny('Esta migration já está na main e pode já ter rodado em produção. Não altere: crie uma migration nova com supabase migration new <descricao>.');
+  }
   if (protectedBranches.has(context.branch) && context.hasCommits) {
     return deny(`Você está na branch ${context.branch}. Antes de editar, crie uma branch: git switch -c feature/<nome>.`);
   }

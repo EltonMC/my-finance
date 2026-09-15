@@ -21,7 +21,7 @@ Guia detalhado, com macOS, Windows e Linux: **[docs/guia/01-instalacao.md](../do
 
 ```bash
 # 1. Ferramentas (macOS). Windows/Linux: veja o guia.
-curl -fsSL https://raw.githubusercontent.com/EltonMC/harness-for-noobs/v0.3.0/Brewfile -o "$TMPDIR/harness-Brewfile"
+curl -fsSL https://raw.githubusercontent.com/EltonMC/harness-for-noobs/v0.4.0/Brewfile -o "$TMPDIR/harness-Brewfile"
 brew bundle --file="$TMPDIR/harness-Brewfile"
 
 # 2. Crie SEU projeto a partir do Harness (não use git clone)
@@ -61,7 +61,10 @@ Mais em [docs/guia/03-dia-a-dia.md](../docs/guia/03-dia-a-dia.md) e [docs/guia/0
 5. [Antes de lançar em produção](../docs/guia/05-producao.md)
 6. [Custos e tokens](../docs/guia/06-custos-e-tokens.md)
 7. [Atualizando o Harness](../docs/guia/07-atualizando-o-harness.md)
-8. [Glossário](../docs/guia/glossario.md)
+8. [Banco de dados](../docs/guia/08-banco-de-dados.md)
+9. [Incidente de segurança](../docs/guia/09-incidente-de-seguranca.md)
+10. [Segurança](../docs/guia/10-seguranca.md)
+11. [Glossário](../docs/guia/glossario.md)
 
 ## Arquitetura escolhida
 

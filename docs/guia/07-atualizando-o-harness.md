@@ -21,6 +21,8 @@ O token padrão do GitHub não pode alterar arquivos de workflow, e quase toda v
 3. **Permissions → Repository permissions:** *Contents: Read and write*, *Pull requests: Read and write*, *Workflows: Read and write*.
 4. Validade: 1 ano. Anote na agenda para renovar.
 5. No repositório: **Settings → Secrets and variables → Actions → New repository secret**. Nome `HARNESS_UPDATE_TOKEN` e cole o token.
+   - Use um token *fine-grained* restrito a **este repositório**, com expiração (ex.: 90 dias) e só as permissões Contents, Pull requests e Workflows. Esse token consegue mudar os workflows do projeto: se vazar, revogue na hora (guia 09).
+   - Quando o PR de atualização mostrar 🔴 **"Esta atualização muda proteções do projeto"**, confira se o CHANGELOG explica cada arquivo listado antes do merge.
 6. Rode `npm run harness -- github-protect --apply`: ele permite que o GitHub Actions abra pull requests.
 
 ## O que a atualização nunca toca
@@ -64,7 +66,7 @@ Elas têm versões travadas e um verificador semanal próprio no repositório do
 
 1. Numa branch nova: `git switch -c chore/adopt-copier`
 2. `git remote -v`: se o `origin` ainda aponta para o repositório do Harness, rode `git remote remove origin` e adicione o seu.
-3. `uvx copier@9.18.2 copy --vcs-ref v0.3.0 --overwrite gh:EltonMC/harness-for-noobs .` e responda as perguntas.
+3. `uvx copier@9.18.2 copy --vcs-ref v0.4.0 --overwrite gh:EltonMC/harness-for-noobs .` e responda as perguntas.
 4. Revise com `git diff`: restaure com `git restore <arquivo>` qualquer arquivo do seu produto que tenha mudado.
-5. Siga os passos manuais da versão 0.3.0 no `CHANGELOG.md`.
+5. Siga os passos manuais das versões 0.3.0 e 0.4.0 no `CHANGELOG.md`.
 6. `npm run harness -- setup`, `npm run check`, commit e pull request.

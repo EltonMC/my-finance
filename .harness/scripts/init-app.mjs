@@ -3,13 +3,17 @@ import { dirname, join, relative } from 'node:path';
 import { runCaptured } from './process-utils.mjs';
 import { readProjectConfig, writeProjectCommands } from './project-config.mjs';
 import { exists, repositoryRoot } from './skill-source-utils.mjs';
+import { hardenSupabaseConfig } from './supabase-config-guard.mjs';
 
 // Installs the locked React + Supabase application template. Deterministic:
 // no agent tokens are spent scaffolding, and existing files are never overwritten.
 
 const textExtensions = /\.(?:json|jsonc|ya?ml|html|tsx?|jsx?|css|sql|md|toml|example)$|^\.env\.example$|\.gitkeep$/;
 
-export const applicationCommands = { lint: 'pnpm lint', typecheck: 'pnpm typecheck', test: 'pnpm test', build: 'pnpm build', e2e: 'pnpm test:e2e' };
+// Locales with a copy catalog in .harness/app-template/src/shared/i18n/messages.ts.
+export const supportedProductLocales = ['pt-BR', 'en-US', 'es-ES'];
+
+export const applicationCommands ={ lint: 'pnpm lint', typecheck: 'pnpm typecheck', test: 'pnpm test', build: 'pnpm build', e2e: 'pnpm test:e2e' };
 
 export function mergePackageJson(base, fragment) {
   const harnessScripts = { ...base.scripts };
@@ -73,6 +77,9 @@ export async function initApplication({ root = repositoryRoot, projectName, prod
     projectName: projectName ?? project.project_name ?? basePackage.name ?? 'app',
     productLocale: productLocale ?? project.product_locale ?? 'pt-BR',
   };
+  if (!supportedProductLocales.includes(values.productLocale)) {
+    throw new Error(`Nada foi alterado: o idioma do produto "${values.productLocale}" não tem textos no template. Use um destes em .harness/project.yaml (product_locale): ${supportedProductLocales.join(', ')}.`);
+  }
   const templateRoot = join(root, '.harness', 'app-template');
   const files = (await listFiles(templateRoot)).filter((file) => file !== 'package.fragment.json');
   const conflicts = [];
@@ -104,6 +111,10 @@ export async function initApplication({ root = repositoryRoot, projectName, prod
   if (runSupabaseInit && !supabaseInitialized) {
     const result = await runCaptured('supabase', ['init'], { cwd: root, timeoutMs: 60_000 });
     supabaseInitialized = result.code === 0;
+    if (supabaseInitialized) {
+      const configPath = join(root, 'supabase', 'config.toml');
+      await writeFile(configPath, hardenSupabaseConfig(await readFile(configPath, 'utf8')));
+    }
   }
   print(`Aplicação "${values.projectName}" criada com ${files.length} arquivos.`);
   return { files, supabaseInitialized, values };
