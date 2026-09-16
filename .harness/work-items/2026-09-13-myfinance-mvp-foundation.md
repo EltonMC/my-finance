@@ -17,6 +17,7 @@ Ship the first secure, mobile-first MyFinance slice with an authenticated React/
 ## Acceptance criteria
 
 - [ ] The implementation satisfies FR-001 through FR-032 and NFR-001 through NFR-005 from the approved handoff.
+- [ ] User-account creation requests only name, email, and password; login requests email and password.
 - [ ] Private user data is protected with RLS allow and deny tests.
 - [ ] Every defined multi-record financial mutation is atomic and cannot create duplicate payment or recurring-bill records.
 - [ ] The main flows work at a 320px viewport with accessible labels and keyboard behavior.
@@ -48,9 +49,9 @@ Ship the first secure, mobile-first MyFinance slice with an authenticated React/
 - Files changed: planning and delivery artifacts initialized; implementation pending.
 - TDD red evidence: `docker compose run --rm --build test` failed as expected because `createInstallmentPlan`, financial rules, and `App` did not yet exist; each failure was corrected with the minimum implementation.
 - TDD green evidence: `docker compose run --rm --build test npm run test -- --reporter=verbose` passed 7 tests on 2026-09-13: installment distribution, points, billing-date fallback, statement payment eligibility, amount due, login form, and payment confirmation.
-- TDD refactor evidence: domain rules remain isolated in `src/domain`; UI state remains in the feature route component; lint is configured but blocked from a fresh image build by Docker Desktop storage exhaustion.
-- Checks run: `git diff --check` passed; Docker build passed after TypeScript/Vite configuration fixes. The build produced the Vite static bundle successfully.
+- TDD refactor evidence: domain rules remain isolated in `src/domain`; UI state remains in the feature route component. The Harness 0.3.0 migration moved the application runtime to pinned pnpm on the host and leaves Docker for local Supabase services only.
+- Checks run: on 2026-09-14, `npm run harness -- verify` passed lint, typecheck, tests, build, bundle secret scan, database lint, and pgTAP RLS guard; `npm run check` passed 110 Harness tests; `git diff --check` passed.
 - Review findings and disposition: database pre-review is `APPROVE WITH CONDITIONS`; independent implementation review is pending.
-- Remaining risks: Supabase local-stack migration reset, lint, pgTAP, and RLS policy tests are blocked because Docker Desktop exhausted its storage while downloading the official local Supabase images. A Supabase URL and publishable key are also required for a live browser login.
+- Remaining risks: operation-specific pgTAP owner-allow and second-user-deny coverage for each client action remains required before a product PR. A Supabase URL and publishable key are also required for a live browser login.
 - Independent-review evidence or proportional exception: required before PR.
-- Course-correction record: not needed.
+- Course-correction record: on 2026-09-14, the owner amended FR-001 so user-account creation asks for only name, email, and password; the product brief, PRD, approved handoff, and acceptance criteria were reconciled before authentication implementation.

@@ -1,0 +1,10 @@
+# Product-owned configuration. Harness updates never overwrite this file.
+project_name: "MyFinance"
+owner_locale: pt-BR
+product_locale: pt-BR
+commands:
+  lint: pnpm lint
+  typecheck: pnpm typecheck
+  test: pnpm test
+  build: pnpm build
+  e2e: pnpm test:e2e
