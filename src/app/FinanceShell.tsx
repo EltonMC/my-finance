@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import type { FinanceAccount } from '@/features/accounts/api/account-repository';
 import { AccountDialog } from '@/features/accounts/components/AccountDialog';
 import { useAccountCommand } from '@/features/accounts/hooks/use-account-command';
@@ -294,6 +294,13 @@ export function FinanceShell({ onSignOut }: { onSignOut: () => Promise<void> }) 
                 <strong>{formatBrl(account.balanceCents)}</strong>
                 <small>{account.institution ?? translate('home.balanceLabel')}</small>
                 <div className="card-actions">
+                  <Link
+                    className="text-button activity-link"
+                    aria-label={translate('accounts.viewActivity', { name: account.name })}
+                    to={`/accounts/${account.id}/activity`}
+                  >
+                    {translate('navigation.activity')}
+                  </Link>
                   <button
                     type="button"
                     className="text-button"

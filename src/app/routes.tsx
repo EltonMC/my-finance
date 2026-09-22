@@ -12,6 +12,7 @@ export const appRoutes: RouteObject[] = [
     children: [
       { index: true, element: <App /> },
       { path: 'settings', element: <App /> },
+      { path: 'accounts/:accountId/activity', element: <App /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },
