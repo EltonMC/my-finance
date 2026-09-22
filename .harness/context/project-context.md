@@ -4,7 +4,7 @@ Product-owned: Harness updates never overwrite this file. Harness-wide technolog
 
 ## Product
 
-MyFinance is a private, Brazilian-Portuguese, mobile-first personal-finance ledger. One authenticated person records checking accounts, categorized account transactions, pending monthly bills, credit-card statements, installments, chargebacks, full statement payments, and expected reward points. Bank synchronization, partial payments, interest, and live FX rates are out of scope for the first delivery.
+MyFinance is a private, Brazilian-Portuguese, mobile-first personal-finance ledger. The current browser app covers authentication, account and category management, balances, and posted account history. The approved manual MVP also includes direct and pending account activity, recurring bills, credit cards and statements, installments, chargebacks, total/partial/advance invoice payments, and expected reward points. Open Finance bank synchronization, payment initiation, interest, and live FX rates are deferred. The expanded FR-033–FR-060 handoff still needs epic/story readiness before new finance behavior is implemented.
 
 ## Project-specific rules for agents
 
