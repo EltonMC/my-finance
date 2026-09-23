@@ -159,6 +159,18 @@ small {
   padding: 4px 0;
   border: 0;
 }
+.back-button {
+  min-height: 44px;
+}
+.activity-link {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+}
+.topbar h1 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .ledger-section {
   margin-top: 28px;
 }
@@ -258,6 +270,15 @@ small {
 .ledger-row span {
   color: #475569;
   font-size: 14px;
+}
+.activity-list {
+  list-style: none;
+  margin: 24px 0 0;
+  padding: 0;
+}
+.activity-amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 .debit {
   color: #b91c1c;

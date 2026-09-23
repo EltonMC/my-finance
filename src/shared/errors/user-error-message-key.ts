@@ -2,13 +2,21 @@ import type { MessageKey } from '@/shared/i18n/messages';
 import { AuthConfigurationError, AuthNetworkError } from './auth-errors';
 import { DuplicateNameError } from './duplicate-name';
 
-export type ErrorOperation = 'sign-in' | 'sign-up' | 'sign-out' | 'load-finance' | 'save-account' | 'save-category';
+export type ErrorOperation =
+  | 'sign-in'
+  | 'sign-up'
+  | 'sign-out'
+  | 'load-finance'
+  | 'load-activity'
+  | 'save-account'
+  | 'save-category';
 
 const fallback: Record<ErrorOperation, MessageKey> = {
   'sign-in': 'auth.signInFailure',
   'sign-up': 'auth.signUpFailure',
   'sign-out': 'home.signOutFailure',
   'load-finance': 'home.loadError',
+  'load-activity': 'activity.loadError',
   'save-account': 'home.saveError',
   'save-category': 'home.saveError',
 };

@@ -1,5 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
+import { useParams } from 'react-router';
+import { AccountActivityPage } from '@/features/activity/AccountActivityPage';
 import { AuthScreen } from '@/features/auth/AuthScreen';
 import { useSignOut } from '@/features/auth/hooks/use-auth-command';
 import { useSession } from '@/features/auth/hooks/use-session';
@@ -13,6 +15,7 @@ type AppProps = {
 };
 
 export function App({ initialSession = false }: AppProps) {
+  const { accountId } = useParams();
   const [authenticated, setAuthenticated] = useState(initialSession);
   const queryClient = useQueryClient();
   const { mutateAsync: signOut } = useSignOut();
@@ -43,6 +46,8 @@ export function App({ initialSession = false }: AppProps) {
       />
     );
   }
+
+  if (accountId !== undefined) return <AccountActivityPage key={userId ?? 'session'} />;
 
   return (
     <FinanceShell
