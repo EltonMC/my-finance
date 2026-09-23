@@ -1,7 +1,7 @@
-import { defineConfig, devices } from '@playwright/test'
+import { defineConfig, devices } from '@playwright/test';
 
-const port = 4173
-const baseURL = `http://127.0.0.1:${port}`
+const port = 4173;
+const baseURL = `http://127.0.0.1:${port}`;
 
 // The smoke suite runs against the production build and must not need Supabase,
 // so it only covers what renders before any network call: the sign-in screen.
@@ -25,4 +25,4 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
-})
+});
